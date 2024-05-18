@@ -175,7 +175,16 @@ import { connectToDB } from "../mongoose";
 import User from "../models/user.model";
 import Thread from "../models/thread.model";
 import Community from "../models/community.model";
+import mongoose from 'mongoose';
 
+function stringToObjectId(str: string) {
+  try {
+    return new mongoose.Types.ObjectId(str);
+  } catch (error) {
+    console.error('Error converting string to ObjectId:', error);
+    return null;
+  }
+}
 export async function fetchPosts(pageNumber = 1, pageSize = 20) {
   connectToDB();
 
@@ -237,6 +246,7 @@ export async function createThread({ text, author, communityId, path }: Params
       text,
       author,
       community: communityIdObject, // Assign communityId if provided, or leave it null for personal account
+      likeCount: 0,
     });
 
     // Update User model
@@ -406,3 +416,83 @@ export async function addCommentToThread(
     throw new Error("Unable to add comment");
   }
 }
+
+export async function updateLikeCount(threadId: string, update: number
+  ) {
+    try {
+      connectToDB();
+      
+      const updatedThread = await Thread.findByIdAndUpdate(
+          {_id: threadId},
+          { $inc: { likeCount: update } },
+          { new: true }
+      );
+
+      // console.log('Updated Post:', updatedThread);
+
+    } catch (error: any) {
+      console.error('Error updating like count:', error);
+    }
+  }
+
+  export async function hasUserLikedThread(userId: string, threadId: string) {
+    try {
+      
+      // const objectIdUserId = stringToObjectId(userId); 
+      const thread = await Thread.findById(threadId);
+      if (!thread) {
+        throw new Error('Thread not found');
+      }
+      
+      return {
+        likeCount: thread.likedBy.length,
+        isLikedByUser: thread.likedBy.includes(userId)
+      }
+    } catch (error) {
+      console.error('Error checking if user has liked thread:', error);
+      return false;
+    }
+  }
+
+  export async function unlikeThread(userId: string, threadId: string) {
+    try {
+
+      // const objectIdUserId = stringToObjectId(userId); 
+      const updatedThread = await Thread.findByIdAndUpdate(
+        threadId,
+        { $pull: { likedBy: userId } },
+        { new: true }
+      );
+  
+      if (!updatedThread) {
+        throw new Error('Thread not found');
+      }
+      
+      console.log('User unliked thread:', threadId);
+      return true;
+    } catch (error) {
+      console.error('Error unliking thread:', error);
+      return false;
+    }
+  }
+
+  export async function likeThread(userId: string, threadId: string) {
+    try {
+      // const objectIdUserId = stringToObjectId(userId);
+      const updatedThread = await Thread.findByIdAndUpdate(
+        threadId,
+        { $addToSet: { likedBy: userId } }, // Using $addToSet to ensure uniqueness
+        { new: true }
+      );
+  
+      if (!updatedThread) {
+        throw new Error('Thread not found');
+      }
+      
+      console.log('User liked thread:', threadId);
+      return true;
+    } catch (error) {
+      console.error('Error liking thread:', error);
+      return false;
+    }
+  }
